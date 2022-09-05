@@ -1,0 +1,115 @@
+name: CI / Plan - Testing
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, dev]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Run terraform fmt check
+        run: terraform fmt -diff=true -check=true ./terraform
+
+  plan:
+    name: Plan
+    env:
+      TF_VAR_allowed_account_id: ${{ secrets.ALLOWED_PRD_ACCOUNT_ID }}
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Run tfsec with reviewdog output on the PR
+        uses: reviewdog/action-tfsec@master
+        with:
+          github_token: ${{ secrets.GH_TOKEN }}
+          working_directory: terraform/
+          level: error
+          reporter: github-pr-review
+          filter_mode: nofilter
+          fail_on_error: false
+          flags: -tee
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.DEV_TF_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.DEV_TF_AWS_SECRET_ACCESS_KEY }}
+
+      - name: Initialize Terraform
+        run: |
+          cd terraform/prd
+          terraform init -input=false
+
+      - name: Plan Terraform
+        id: plan
+        continue-on-error: true
+        run: |
+          cd terraform/prd
+          terraform plan -input=false -no-color -out=tfplan \
+          && terraform show -no-color tfplan
+
+      - name: Reformat Plan
+        run: |
+          echo '${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}' \
+          | sed -E 's/^([[:space:]]+)([-+])/\2\1/g' > plan.txt
+
+      - name: Put Plan in Env Var
+        run: |
+          PLAN=$(cat plan.txt)
+          echo "PLAN<<EOF" >> $GITHUB_ENV
+          echo "$PLAN" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Post Plan to GitHub PR
+        uses: mshick/add-pr-comment@v1
+        with:
+          allow-repeats: true
+          repo-token: ${{ secrets.GH_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            ## prd plan
+            ```diff
+            ${{ env.PLAN }}
+            ```
+
+      - name: InfraCost - Terraform plan/show
+        run: |
+          cd terraform/prd
+          terraform plan -out tfplan.binary \
+          && terraform show -json tfplan.binary > plan.json
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v1
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost JSON && comment
+        run: |
+          cd terraform/prd
+          infracost breakdown --path plan.json --format json --out-file infracost.json
+          infracost comment github --path infracost.json \
+                                   --repo $GITHUB_REPOSITORY \
+                                   --github-token ${{github.token}} \
+                                   --pull-request ${{github.event.pull_request.number}} \
+                                   --behavior new
