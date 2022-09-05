@@ -46,7 +46,7 @@ jobs:
         id: plan
         run: |
           cd terraform/dev
-          terraform plan -destroy -no-color -input=false
+          terraform plan -no-color -input=false
         continue-on-error: true
 
       - uses: actions/github-script@v6
@@ -85,4 +85,4 @@ jobs:
       - name: Terraform Apply
         run: |
           cd terraform/dev
-          terraform apply -destroy -auto-approve -input=false
+          terraform apply -auto-approve -input=false

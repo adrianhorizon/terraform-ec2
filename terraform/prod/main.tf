@@ -1,23 +1,26 @@
 module "key_pair" {
-  source = "../modules/key_pair/"
-  environment = "prd"
+  source      = "../modules/key_pair/"
+  environment = "prod"
 }
 
 module "ec2" {
-  source = "../modules/ec2"
-    accountid = "097489095306"
-    environment = "prd"
-    vpc_cidr = "172.31.0.0/16"
-    vpc_id = "vpc-e9067082"
-    public_sub_1_id = "subnet-e5e6788e"
-    public_sub_2_id = "subnet-4bfc2836"
-    private_sub_1_id = "subnet-0ec74b9415fa02744"
-    private_sub_2_id = "subnet-0b9b47f667ebd7397"
-    acm-com = "0779793d-de30-4950-a956-c660aace4448"
-    OIDC_PROVIDER = "https://oidc.eks.us-east-2.amazonaws.com/id/4A71AD7DEAE967627A2A55BA9EEC86C2"
-    domain = "netamx.tech"
-    idroute53 = "Z07830932DFHXD67734GW"
-    region-efs-image = "us-east-2"
-    deploymentaccount = "terraform-data"
-    ssorole = "AWSReservedSSO_AWSAdministratorAccess_2c5d2e7ca1516fe4"
+  source = "../modules/ecs_module/"
+
+  vpc_cidr            = "172.33.0.0/16"
+  app_name            = "krusty-test"
+  app_environment     = "krusty"
+  aws_region          = "us-east-1"
+  app_sources_cidr    = ["0.0.0.0/0"]
+  admin_sources_cidr  = ["0.0.0.0/0"]
+  aws_key_pair_name   = "test-pem-prod"
+  nginx_image         = "nginx:alpine"
+  krusty_port         = 8080
+  nginx_port          = 80
+  nginx_count         = 2
+  fargate_cpu         = "1024"
+  fargate_memory      = "2048"
+  type_instance_count = "1"
+  nginx_test_name     = "prod"
+  type_instance       = "t3a.medium"
+  krusty_environment  = "prod"
 }
