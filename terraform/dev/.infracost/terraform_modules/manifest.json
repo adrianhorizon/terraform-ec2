@@ -1,0 +1,1 @@
+{"Modules":[{"Key":"key_pair","Source":"../modules/key_pair/","Dir":"../modules/key_pair"},{"Key":"ec2","Source":"../modules/ecs_module/","Dir":"../modules/ecs_module"}]}
