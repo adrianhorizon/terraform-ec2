@@ -1,9 +1,6 @@
 name: CI / Plan - Testing
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main, dev]
+on: [pull_request]
 
 jobs:
   lint:
@@ -17,6 +14,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
 
       - name: Run terraform fmt check
         run: terraform fmt -diff=true -check=true ./terraform
@@ -83,8 +81,8 @@ jobs:
         uses: mshick/add-pr-comment@v1
         with:
           allow-repeats: true
-          repo-token: ${{ secrets.GH_TOKEN }}
-          repo-token-user-login: 'github-actions[bot]'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: "github-actions[bot]"
           message: |
             ## dev plan
             ```diff
@@ -98,7 +96,7 @@ jobs:
           && terraform show -json tfplan.binary > plan.json
 
       - name: Setup Infracost
-        uses: infracost/actions/setup@v1
+        uses: infracost/actions/setup@v2
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
@@ -108,6 +106,6 @@ jobs:
           infracost breakdown --path plan.json --format json --out-file infracost.json
           infracost comment github --path infracost.json \
                                    --repo $GITHUB_REPOSITORY \
-                                   --github-token ${{github.token}} \
+                                   --github-token $GITHUB_TOKEN \
                                    --pull-request ${{github.event.pull_request.number}} \
-                                   --behavior new
+                                   --behavior delete-and-new

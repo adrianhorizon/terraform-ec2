@@ -21,6 +21,6 @@ module "ec2" {
   fargate_memory      = "2048"
   type_instance_count = "1"
   nginx_test_name     = "dev"
-  type_instance       = "c5a.large"
+  type_instance       = "t2.small"
   krusty_environment  = "dev"
 }
